@@ -63,14 +63,29 @@ namespace ALICheckers
                     }
                     // Capture move
                     else if (deltaAbs.y == 2 && deltaAbs.y == 2) {
-                        Piece capturedPiece = this.GetPiece((start.y + delta.y, start.x + delta.x));
-                        if (capturedPiece.IsPiece() && startPiece.GetColor() == capturedPiece.GetColor()) {
+                        Piece capturedPiece = this.GetPiece((start.y + delta.y/2, start.x + delta.x/2));
+                        if (capturedPiece.IsPiece() && startPiece.GetColor() != capturedPiece.GetColor()) {
                            return true;
                         }
                     }
                 }
             }
             return false; 
+        }
+
+        // NOTE: Should return a new state later on.
+        // NOTE: Doesn't implement captures
+        public bool MakeMove((int y, int x) start, (int y, int x) end)
+        {
+            if (IsMoveValid(start, end)) {
+                Piece piece = GetPiece(start);
+                this.board[start.y, start.x] = Piece.Empty;
+                this.board[end.y, end.x] = piece;
+                return true;
+            }
+            else {
+                return false;
+            }
         }
 
         override public string ToString()
