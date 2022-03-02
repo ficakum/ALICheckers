@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace ALICheckers
 {
@@ -13,12 +14,15 @@ namespace ALICheckers
     {
         Piece[,] board;
         int size;
+        // Maybe rename to Player
+        Color playing;
         const int PieceRowCount = 3;
 
         public Board(int size)
         {
             this.board = new Piece[size,size];
             this.size = size;
+            this.playing = Color.Black;
             InitializeBoard();
         }
 
@@ -71,22 +75,24 @@ namespace ALICheckers
 
         public bool IsMoveValid((int y,int x) start, (int y,int x) end) 
         {
-            Piece endPiece = this.GetPiece(end);
-            Piece startPiece = this.GetPiece(start);
-            if (endPiece == Piece.Empty && startPiece.IsPiece()) {
-                (int y, int x) delta = (end.y - start.y, end.x - start.x);
+            if(IsInBounds(start) && IsInBounds(end)) {
+                Piece endPiece = this.GetPiece(end);
+                Piece startPiece = this.GetPiece(start);
+                if (endPiece == Piece.Empty && startPiece.GetColor() == this.playing) {
+                    (int y, int x) delta = (end.y - start.y, end.x - start.x);
 
-                if (startPiece.IsKing() || (startPiece.IsPawn() && startPiece.IsValidDirection(delta.y))) {
-                    MoveType type = GetMoveType(delta);
-                    // Regular move
-                    if (type == MoveType.Normal) {
-                        return true;
-                    }
-                    // Capture move
-                    else if (type == MoveType.Capture) {
-                        Piece capturedPiece = this.GetPiece((start.y + delta.y/2, start.x + delta.x/2));
-                        if (capturedPiece.IsPiece() && startPiece.GetColor() != capturedPiece.GetColor()) {
-                           return true;
+                    if (startPiece.IsKing() || (startPiece.IsPawn() && startPiece.IsValidDirection(delta.y))) {
+                        MoveType type = GetMoveType(delta);
+                        // Regular move
+                        if (type == MoveType.Normal) {
+                            return true;
+                        }
+                        // Capture move
+                        else if (type == MoveType.Capture) {
+                            Piece capturedPiece = this.GetPiece((start.y + delta.y/2, start.x + delta.x/2));
+                            if (capturedPiece.IsPiece() && startPiece.GetColor() != capturedPiece.GetColor()) {
+                               return true;
+                            }
                         }
                     }
                 }
@@ -109,10 +115,51 @@ namespace ALICheckers
                 Piece movingPiece = GetPiece(start);
                 this.board[start.y, start.x] = Piece.Empty;
                 this.board[end.y, end.x] = movingPiece;
+
+                // Switch to the opposing color
+                this.playing = this.playing == Color.Black? Color.White : Color.Black;
+
                 return true;
             }
             else {
                 return false;
+            }
+        }
+
+        public bool IsInBounds((int y, int x) pos)
+        {
+            return pos.y >= 0 && pos.y < size && 
+                   pos.x >= 0 && pos.x < size;
+        }
+
+
+        // NOTE: Doesn't do multiple captures in one move atm.
+        public IEnumerable<((int y, int x) start, (int y, int x) end)> GetAllMoves()
+        {
+            // Scan for the current player's pieces
+            for (int y = 0; y < size; y++) {
+                for (int x = 0; x < size; x++) {
+                    Piece piece = GetPiece((y,x));
+                    // Maybe split this off into a separate function?
+                    if(piece.GetColor() == this.playing) {
+                        (int y, int x) start = (y, x);
+                        // Goes in both y directions for kings, only one otherwise
+                        for (int dy = -1; dy <= 1; dy += 2) {
+                            if (!piece.IsValidDirection(dy))
+                                continue;
+                            // Both x directions for everything
+                            for (int dx = -1; dx <= 1; dx += 2) {
+                                (int y, int x) normalMove = (y+dy, x+dx);
+                                (int y, int x) captureMove = (y+dy*2, x+dx*2);
+
+                                if(IsMoveValid(start, normalMove))
+                                    yield return (start, normalMove);
+                                if(IsMoveValid(start, captureMove))
+                                    yield return (start, captureMove);
+                            }
+                        }
+                    }
+                }
             }
         }
 

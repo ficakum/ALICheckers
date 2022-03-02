@@ -8,16 +8,14 @@ namespace ALICheckers
         static void Main(string[] args)
         {
             Board b = new Board(8);
-            Console.Write(b);
-            Debug.Assert(b.IsMoveValid((2,1), (3,0)));
-            Debug.Assert(!b.IsMoveValid((2,1), (3,1)));
-            Debug.Assert(!b.IsMoveValid((2,3), (4,5)));
-            Console.WriteLine("Tests passed");
 
             while(true) {
-               var move = ReadMove(); 
-               Console.WriteLine(b.MakeMove(move.start, move.end));
-               Console.Write(b);
+                Console.Write(b);
+                foreach (var m in b.GetAllMoves()) {
+                    Console.WriteLine(m);
+                }
+                var move = ReadMove(); 
+                Console.WriteLine(b.MakeMove(move.start, move.end));
             }
         }
 
