@@ -34,7 +34,7 @@ namespace ALICheckers
         {
             Console.Write("From: ");
             var start = ReadPos();
-            Console.Write("To: ");
+            Console.Write("To:   ");
             var end = ReadPos();
             return (start, end);
         }

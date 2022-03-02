@@ -2,6 +2,13 @@ using System;
 
 namespace ALICheckers
 {
+    enum MoveType
+    {
+        Invalid,
+        Normal,
+        Capture
+    }
+
     class Board 
     {
         Piece[,] board;
@@ -48,6 +55,20 @@ namespace ALICheckers
             return this.board[position.Item1, position.Item2];
         }
 
+        private MoveType GetMoveType((int y, int x) delta)
+        {
+            (int y, int x) deltaAbs = (Math.Abs(delta.y), Math.Abs(delta.x));
+            if (deltaAbs.y == 1 && deltaAbs.x == 1) {
+                return MoveType.Normal;
+            }
+            else if (deltaAbs.y == 2 && deltaAbs.y == 2) {
+                return MoveType.Capture;
+            }
+            else {
+                return MoveType.Invalid;
+            }
+        }
+
         public bool IsMoveValid((int y,int x) start, (int y,int x) end) 
         {
             Piece endPiece = this.GetPiece(end);
@@ -56,13 +77,13 @@ namespace ALICheckers
                 (int y, int x) delta = (end.y - start.y, end.x - start.x);
 
                 if (startPiece.IsKing() || (startPiece.IsPawn() && startPiece.IsValidDirection(delta.y))) {
-                    (int y, int x) deltaAbs = (Math.Abs(delta.y), Math.Abs(delta.x));
+                    MoveType type = GetMoveType(delta);
                     // Regular move
-                    if (deltaAbs.y == 1 && deltaAbs.x == 1) {
+                    if (type == MoveType.Normal) {
                         return true;
                     }
                     // Capture move
-                    else if (deltaAbs.y == 2 && deltaAbs.y == 2) {
+                    else if (type == MoveType.Capture) {
                         Piece capturedPiece = this.GetPiece((start.y + delta.y/2, start.x + delta.x/2));
                         if (capturedPiece.IsPiece() && startPiece.GetColor() != capturedPiece.GetColor()) {
                            return true;
@@ -74,13 +95,20 @@ namespace ALICheckers
         }
 
         // NOTE: Should return a new state later on.
-        // NOTE: Doesn't implement captures
         public bool MakeMove((int y, int x) start, (int y, int x) end)
         {
             if (IsMoveValid(start, end)) {
-                Piece piece = GetPiece(start);
+                (int y, int x) delta = (end.y - start.y, end.x - start.x);
+                MoveType type = GetMoveType(delta);
+                
+                // Remove captured piece if it was a capture
+                if (type == MoveType.Capture) {
+                    this.board[start.y + delta.y/2, start.x + delta.x/2] = Piece.Empty;
+                }
+
+                Piece movingPiece = GetPiece(start);
                 this.board[start.y, start.x] = Piece.Empty;
-                this.board[end.y, end.x] = piece;
+                this.board[end.y, end.x] = movingPiece;
                 return true;
             }
             else {
