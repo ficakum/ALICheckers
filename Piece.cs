@@ -15,8 +15,8 @@ namespace ALICheckers
     enum Color
     {
         None = 0,
-        White = 1,
-        Black = -1
+        White = -1,
+        Black = 1
     }
 
     static class PieceExtensions

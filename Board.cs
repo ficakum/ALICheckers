@@ -99,6 +99,41 @@ namespace ALICheckers
             }
         }
 
+        // Probably better to keep a counter rather than scaning every time
+        public int GetScore()
+        {
+            int blackScore = 0;
+            int whiteScore = 0;
+            for (int y = 0; y < this.size; y++) {
+                for (int x = 0; x < this.size; x++) {
+                    switch (GetPiece((y,x))) {
+                        case Piece.BlackPawn:
+                            blackScore += 3;
+                            break;
+                        case Piece.BlackKing:
+                            blackScore += 5;
+                            break;
+                        case Piece.WhitePawn:
+                            whiteScore += 3;
+                            break;
+                        case Piece.WhiteKing:
+                            whiteScore += 5;
+                            break;
+                    }
+                }
+            }
+            return blackScore - whiteScore;
+        }
+
+        // Change later to return who won?
+        public bool IsFinished()
+        {
+            if(GetAllMoves().Count() == 0)      
+                return true;
+            else
+                return false;
+        }
+
         public bool IsMoveValid((int y,int x) start, (int y,int x) end) 
         {
             if(IsInBounds(start) && IsInBounds(end)) {
@@ -229,6 +264,31 @@ namespace ALICheckers
                 return captureMoves; 
             else
                 return GetAllMovesByType(MoveType.Normal).ToList();
+        }
+        
+        public (int bestScore, Board bestChild) Minmax(int depth = 3)
+        {
+            var minOrMax = playing == Color.Black? (Func<int, int, int>) Math.Max : Math.Min;
+            var minOrMaxInv = playing == Color.Black? (Func<int, int, int>) Math.Min : Math.Max;
+            //GetAllMoves().Max(move => MinOrMax * this.NextState(move.start, move.end).Minmax(depth-1).GetScore());
+            int bestScore = minOrMaxInv(100000,-100000);
+            Board bestChild = null;
+
+            if (depth == 0) {
+                return (this.GetScore(), this);
+            }
+            else {
+                foreach (var move in GetAllMoves()) {
+                    Board child = this.NextState(move.start, move.end);
+                    var childMinmax = child.Minmax(depth-1);
+                    if (minOrMax(childMinmax.bestScore, bestScore) == childMinmax.bestScore) {
+                        bestScore = childMinmax.bestScore;
+                        bestChild = child;
+                    }
+                }
+
+                return (bestScore, bestChild);
+            }
         }
 
         override public string ToString()

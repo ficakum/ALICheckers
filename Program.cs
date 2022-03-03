@@ -9,14 +9,19 @@ namespace ALICheckers
         {
             Board b = new Board(8);
 
-            while(true) {
-                Console.Write(b);
-                foreach (var m in b.GetAllMoves()) {
-                    Console.WriteLine(m);
-                }
-                var move = ReadMove(); 
-                Console.WriteLine(b.MakeMove(move.start, move.end));
+            while(!b.IsFinished()) {
+                Console.WriteLine(b);
+                // foreach (var m in b.GetAllMoves()) {
+                //     Console.WriteLine(m);
+                // }
+                var minmax = b.Minmax();
+                Console.WriteLine("Best score: " + minmax.bestScore);
+                b = minmax.bestChild;
+                
+                //var move = ReadMove(); 
+                //Console.WriteLine(b.MakeMove(move.start, move.end));
             }
+            Console.WriteLine(b);
         }
 
         static (int y, int x) ReadPos()
