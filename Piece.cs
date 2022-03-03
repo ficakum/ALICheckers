@@ -67,7 +67,7 @@ namespace ALICheckers
         public static bool IsValidDirection(this Piece piece, int deltaY)
         {
             return (piece.IsKing() ||
-                    ((piece.GetDirection() < 0) == (deltaY < 0)));
+                    (piece.IsPawn() && (piece.GetDirection() < 0) == (deltaY < 0)));
         }
     }
 }

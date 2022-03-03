@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace ALICheckers
 {
@@ -14,9 +15,16 @@ namespace ALICheckers
     {
         Piece[,] board;
         int size;
-        // Maybe rename to Player
+
+        // Maybe rename enum to Player
         Color playing;
+
+        // For the midstates where we're only allowed to continue capturing
+        bool captureMode = false;
+        ((int y, int x) start, (int y, int x) end) lastMove = ((-1,-1), (-1,-1));
+
         const int PieceRowCount = 3;
+
 
         public Board(int size)
         {
@@ -24,6 +32,18 @@ namespace ALICheckers
             this.size = size;
             this.playing = Color.Black;
             InitializeBoard();
+        }
+
+        public Board(Board other)
+        {
+            this.size = other.size;
+            this.board = new Piece[size,size];
+            this.playing = other.playing;
+            for (int y = 0; y < this.size; y++) {
+                for (int x = 0; x < this.size; x++) {
+                    this.board[y,x] = other.board[y,x];
+                }
+            }
         }
 
         private void InitializeBoard()
@@ -59,6 +79,12 @@ namespace ALICheckers
             return this.board[position.Item1, position.Item2];
         }
 
+        public Board Clone()
+        {
+            return new Board(this);
+        }
+
+        // Should be in the move class probably
         private MoveType GetMoveType((int y, int x) delta)
         {
             (int y, int x) deltaAbs = (Math.Abs(delta.y), Math.Abs(delta.x));
@@ -110,14 +136,27 @@ namespace ALICheckers
                 // Remove captured piece if it was a capture
                 if (type == MoveType.Capture) {
                     this.board[start.y + delta.y/2, start.x + delta.x/2] = Piece.Empty;
+                    this.captureMode = true;
+                }
+                else {
+                    // Switch to the opposing color
+                    this.playing = this.playing == Color.Black? Color.White : Color.Black;
                 }
 
                 Piece movingPiece = GetPiece(start);
                 this.board[start.y, start.x] = Piece.Empty;
                 this.board[end.y, end.x] = movingPiece;
 
-                // Switch to the opposing color
-                this.playing = this.playing == Color.Black? Color.White : Color.Black;
+                this.lastMove = (start, end);
+
+                // Check if the capturing can continue or not
+                if (captureMode) {
+                    var pieceCaptureMoves = GetPieceMovesByType(lastMove.end, MoveType.Capture).ToList();
+                    if (pieceCaptureMoves.Count() == 0) {
+                        captureMode = false;
+                        this.playing = this.playing == Color.Black? Color.White : Color.Black;
+                    }
+                }
 
                 return true;
             }
@@ -126,41 +165,70 @@ namespace ALICheckers
             }
         }
 
+        // Name temporary?
+        public Board NextState((int y, int x) start, (int y, int x) end)
+        {
+            Board next = this.Clone(); 
+            if(next.MakeMove(start, end))
+                return next;
+            else
+                return null;
+        }
+
         public bool IsInBounds((int y, int x) pos)
         {
             return pos.y >= 0 && pos.y < size && 
                    pos.x >= 0 && pos.x < size;
         }
 
+        private IEnumerable<((int y, int x) start, (int y, int x) end)> GetPieceMovesByType((int y, int x) piecePos, MoveType type)
+        {
+            Piece piece = GetPiece(piecePos);
+            if (piece.GetColor() == this.playing) {
+                // Goes in both y directions for kings, only one otherwise
+                for (int dy = -1; dy <= 1; dy += 2) {
+                    if (!piece.IsValidDirection(dy))
+                        continue;
+                    // Both x directions for everything
+                    for (int dx = -1; dx <= 1; dx += 2) {
+                        (int y, int x) normalMove = (piecePos.y+dy, piecePos.x+dx);
+                        (int y, int x) captureMove = (piecePos.y+dy*2, piecePos.x+dx*2);
+
+                        if (type == MoveType.Normal && IsMoveValid(piecePos, normalMove))
+                            yield return (piecePos, normalMove);
+                        if (type == MoveType.Capture && IsMoveValid(piecePos, captureMove))
+                            yield return (piecePos, captureMove);
+                    }
+                }
+            }
+        }
 
         // NOTE: Doesn't do multiple captures in one move atm.
-        public IEnumerable<((int y, int x) start, (int y, int x) end)> GetAllMoves()
+        private IEnumerable<((int y, int x) start, (int y, int x) end)> GetAllMovesByType(MoveType type)
         {
             // Scan for the current player's pieces
             for (int y = 0; y < size; y++) {
                 for (int x = 0; x < size; x++) {
-                    Piece piece = GetPiece((y,x));
-                    // Maybe split this off into a separate function?
-                    if(piece.GetColor() == this.playing) {
-                        (int y, int x) start = (y, x);
-                        // Goes in both y directions for kings, only one otherwise
-                        for (int dy = -1; dy <= 1; dy += 2) {
-                            if (!piece.IsValidDirection(dy))
-                                continue;
-                            // Both x directions for everything
-                            for (int dx = -1; dx <= 1; dx += 2) {
-                                (int y, int x) normalMove = (y+dy, x+dx);
-                                (int y, int x) captureMove = (y+dy*2, x+dx*2);
-
-                                if(IsMoveValid(start, normalMove))
-                                    yield return (start, normalMove);
-                                if(IsMoveValid(start, captureMove))
-                                    yield return (start, captureMove);
-                            }
-                        }
+                    foreach(var pieceMove in GetPieceMovesByType((y,x), type)) {
+                        yield return pieceMove;
                     }
                 }
             }
+        }
+
+        // Forces capture moves if they exist, otherwise shows normal moves
+        public List<((int y, int x) start, (int y, int x) end)> GetAllMoves()
+        {
+            // Last move was a capture move, and they have more pieces they can capture
+            if (captureMode) {
+                return GetPieceMovesByType(lastMove.end, MoveType.Capture).ToList();
+            } 
+
+            var captureMoves = GetAllMovesByType(MoveType.Capture).ToList();
+            if (captureMoves.Count() != 0)
+                return captureMoves; 
+            else
+                return GetAllMovesByType(MoveType.Normal).ToList();
         }
 
         override public string ToString()
