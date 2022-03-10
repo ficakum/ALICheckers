@@ -25,6 +25,8 @@ namespace ALICheckers
 
         const int PieceRowCount = 3;
 
+        private static readonly Random rng = new Random();
+
 
         public Board(int size)
         {
@@ -102,27 +104,35 @@ namespace ALICheckers
         // Probably better to keep a counter rather than scaning every time
         public int GetScore()
         {
-            int blackScore = 0;
-            int whiteScore = 0;
+            // Piece count
+            int blackPieceScore = 0;
+            int whitePieceScore = 0;
+            // How close they are to promoting pawns
+            int blackPositionScore = 0;
+            int whitePositionScore = 0;
             for (int y = 0; y < this.size; y++) {
                 for (int x = 0; x < this.size; x++) {
                     switch (GetPiece((y,x))) {
                         case Piece.BlackPawn:
-                            blackScore += 3;
+                            blackPieceScore += 3;
+                            blackPositionScore += this.size-y-1;
                             break;
                         case Piece.BlackKing:
-                            blackScore += 5;
+                            blackPieceScore += 5;
                             break;
                         case Piece.WhitePawn:
-                            whiteScore += 3;
+                            whitePieceScore += 3;
+                            whitePositionScore += y;
                             break;
                         case Piece.WhiteKing:
-                            whiteScore += 5;
+                            whitePieceScore += 5;
                             break;
                     }
                 }
             }
-            return blackScore - whiteScore;
+            return ((blackPieceScore - whitePieceScore)*100 +
+                    (blackPositionScore - whitePositionScore) +
+                    rng.Next(0, 10));
         }
 
         // Change later to return who won?
@@ -161,7 +171,6 @@ namespace ALICheckers
             return false; 
         }
 
-        // NOTE: Should return a new state later on.
         public bool MakeMove((int y, int x) start, (int y, int x) end)
         {
             if (IsMoveValid(start, end)) {
@@ -180,7 +189,14 @@ namespace ALICheckers
 
                 Piece movingPiece = GetPiece(start);
                 this.board[start.y, start.x] = Piece.Empty;
-                this.board[end.y, end.x] = movingPiece;
+
+                // Handle promotion, or just move the piece to the destination
+                if (end.y == 0 && movingPiece == Piece.BlackPawn)
+                    this.board[end.y, end.x] = Piece.BlackKing;
+                else if (end.y == size-1 && movingPiece == Piece.WhitePawn)
+                    this.board[end.y, end.x] = Piece.WhiteKing;
+                else
+                    this.board[end.y, end.x] = movingPiece;
 
                 this.lastMove = (start, end);
 
@@ -266,19 +282,27 @@ namespace ALICheckers
                 return GetAllMovesByType(MoveType.Normal).ToList();
         }
         
-        public (int bestScore, Board bestChild) Minmax(int depth = 3)
+        public (int bestScore, Board bestChild) Minmax(int depth = 6)
         {
             var minOrMax = playing == Color.Black? (Func<int, int, int>) Math.Max : Math.Min;
             var minOrMaxInv = playing == Color.Black? (Func<int, int, int>) Math.Min : Math.Max;
-            //GetAllMoves().Max(move => MinOrMax * this.NextState(move.start, move.end).Minmax(depth-1).GetScore());
-            int bestScore = minOrMaxInv(100000,-100000);
-            Board bestChild = null;
+            int worstScore = minOrMaxInv(100000,-100000);
+
+            var allMoves = GetAllMoves();
+            // In case of a loss don't go further.
+            // Doesn't call IsFinished to avoid calling GetAllMoves twice
+            // for no reason.
+            if(allMoves.Count() == 0)
+                return (worstScore, this);
 
             if (depth == 0) {
                 return (this.GetScore(), this);
             }
             else {
-                foreach (var move in GetAllMoves()) {
+                int bestScore = worstScore;
+                Board bestChild = null;
+
+                foreach (var move in allMoves) {
                     Board child = this.NextState(move.start, move.end);
                     var childMinmax = child.Minmax(depth-1);
                     if (minOrMax(childMinmax.bestScore, bestScore) == childMinmax.bestScore) {
