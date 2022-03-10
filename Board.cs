@@ -254,7 +254,6 @@ namespace ALICheckers
             }
         }
 
-        // NOTE: Doesn't do multiple captures in one move atm.
         private IEnumerable<((int y, int x) start, (int y, int x) end)> GetAllMovesByType(MoveType type)
         {
             // Scan for the current player's pieces
@@ -281,8 +280,17 @@ namespace ALICheckers
             else
                 return GetAllMovesByType(MoveType.Normal).ToList();
         }
+
+
+        public (int bestScore, Board bestChild) Minmax(int depth = 9)
+        {
+            if (playing == Color.Black)
+                return Minmax(depth, -100000, +100000);
+            else
+                return Minmax(depth, +100000, -100000);
+        }
         
-        public (int bestScore, Board bestChild) Minmax(int depth = 6)
+        public (int bestScore, Board bestChild) Minmax(int depth, int bestOverallScore, int limit)
         {
             var minOrMax = playing == Color.Black? (Func<int, int, int>) Math.Max : Math.Min;
             var minOrMaxInv = playing == Color.Black? (Func<int, int, int>) Math.Min : Math.Max;
@@ -292,7 +300,7 @@ namespace ALICheckers
             // In case of a loss don't go further.
             // Doesn't call IsFinished to avoid calling GetAllMoves twice
             // for no reason.
-            if(allMoves.Count() == 0)
+            if (allMoves.Count() == 0)
                 return (worstScore, this);
 
             if (depth == 0) {
@@ -304,10 +312,18 @@ namespace ALICheckers
 
                 foreach (var move in allMoves) {
                     Board child = this.NextState(move.start, move.end);
-                    var childMinmax = child.Minmax(depth-1);
+                    var childMinmax = (child.playing == this.playing? 
+                            child.Minmax(depth-1, bestOverallScore, limit) :
+                            child.Minmax(depth-1, limit, bestOverallScore));
                     if (minOrMax(childMinmax.bestScore, bestScore) == childMinmax.bestScore) {
                         bestScore = childMinmax.bestScore;
                         bestChild = child;
+
+                        if (minOrMax(bestScore, bestOverallScore) == bestScore) {
+                            bestOverallScore = bestScore;
+                            if (minOrMax(bestOverallScore, limit) == bestOverallScore)
+                                break;
+                        }
                     }
                 }
 
