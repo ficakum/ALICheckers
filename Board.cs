@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
-namespace ALICheckers
+namespace ALICheckersLogic
 {
     enum MoveType
     {
@@ -11,26 +11,32 @@ namespace ALICheckers
         Capture
     }
 
-    class Board 
+    public class Board
     {
         Piece[,] board;
         int size;
 
         // Maybe rename enum to Player
-        Color playing;
+        public Color playing;
 
         // For the midstates where we're only allowed to continue capturing
         bool captureMode = false;
-        ((int y, int x) start, (int y, int x) end) lastMove = ((-1,-1), (-1,-1));
+        ((int y, int x) start, (int y, int x) end) lastMove = ((-1, -1), (-1, -1));
+        Board prevBoard = null;
 
         const int PieceRowCount = 3;
 
-        private static readonly Random rng = new Random();
+        private static Random rng = new Random();
 
+        public Piece this[int y, int x]
+        {
+            get { return board[y, x]; }
+            // set { board[y, x] = value; }
+        }
 
         public Board(int size)
         {
-            this.board = new Piece[size,size];
+            this.board = new Piece[size, size];
             this.size = size;
             this.playing = Color.Black;
             InitializeBoard();
@@ -39,46 +45,55 @@ namespace ALICheckers
         public Board(Board other)
         {
             this.size = other.size;
-            this.board = new Piece[size,size];
+            this.board = new Piece[size, size];
             this.playing = other.playing;
-            for (int y = 0; y < this.size; y++) {
-                for (int x = 0; x < this.size; x++) {
-                    this.board[y,x] = other.board[y,x];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    this.board[y, x] = other.board[y, x];
                 }
             }
         }
 
         private void InitializeBoard()
         {
-            for (int y = 0; y < this.size; y++) {
-                for (int x = 0; x < this.size; x++) {
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
                     // Valid squares
-                    if ((y+x) % 2 == 1) {
+                    if ((y + x) % 2 == 1)
+                    {
                         // White piece rows
-                        if (y < PieceRowCount) {
-                            this.board[y,x] = Piece.WhitePawn;
-                        } 
-                        // Black piece rows
-                        else if (size - y <= PieceRowCount) {
-                            this.board[y,x] = Piece.BlackPawn;
-                        } 
-                        // Empty rows
-                        else {
-                            this.board[y,x] = Piece.Empty;
+                        if (y < PieceRowCount)
+                        {
+                            board[y, x] = Piece.WhitePawn;
                         }
-                    } 
+                        // Black piece rows
+                        else if (size - y <= PieceRowCount)
+                        {
+                            board[y, x] = Piece.BlackPawn;
+                        }
+                        // Empty rows
+                        else
+                        {
+                            board[y, x] = Piece.Empty;
+                        }
+                    }
                     // Non-valid squares
-                    else {
-                        this.board[y,x] = Piece.Blocked;
+                    else
+                    {
+                        board[y, x] = Piece.Blocked;
                     }
                 }
             }
         }
 
         // Temporary name?
-        public Piece GetPiece((int,int) position) 
+        public Piece GetPiece((int y, int x) position)
         {
-            return this.board[position.Item1, position.Item2];
+            return board[position.y, position.x];
         }
 
         public Board Clone()
@@ -90,13 +105,16 @@ namespace ALICheckers
         private MoveType GetMoveType((int y, int x) delta)
         {
             (int y, int x) deltaAbs = (Math.Abs(delta.y), Math.Abs(delta.x));
-            if (deltaAbs.y == 1 && deltaAbs.x == 1) {
+            if (deltaAbs.y == 1 && deltaAbs.x == 1)
+            {
                 return MoveType.Normal;
             }
-            else if (deltaAbs.y == 2 && deltaAbs.y == 2) {
+            else if (deltaAbs.y == 2 && deltaAbs.y == 2)
+            {
                 return MoveType.Capture;
             }
-            else {
+            else
+            {
                 return MoveType.Invalid;
             }
         }
@@ -110,12 +128,15 @@ namespace ALICheckers
             // How close they are to promoting pawns
             int blackPositionScore = 0;
             int whitePositionScore = 0;
-            for (int y = 0; y < this.size; y++) {
-                for (int x = 0; x < this.size; x++) {
-                    switch (GetPiece((y,x))) {
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    switch (GetPiece((y, x)))
+                    {
                         case Piece.BlackPawn:
                             blackPieceScore += 3;
-                            blackPositionScore += this.size-y-1;
+                            blackPositionScore += size - y - 1;
                             break;
                         case Piece.BlackKing:
                             blackPieceScore += 5;
@@ -130,120 +151,145 @@ namespace ALICheckers
                     }
                 }
             }
-            return ((blackPieceScore - whitePieceScore)*100 +
+            return (blackPieceScore - whitePieceScore) * 100 +
                     (blackPositionScore - whitePositionScore) +
-                    rng.Next(0, 10));
+                    rng.Next(0, 10);
         }
 
         // Change later to return who won?
         public bool IsFinished()
         {
-            if(GetAllMoves().Count() == 0)      
+            if (GetAllMoves().Count() == 0)
                 return true;
             else
                 return false;
         }
 
-        public bool IsMoveValid((int y,int x) start, (int y,int x) end) 
+        public bool IsMoveValid((int y, int x) start, (int y, int x) end, bool isHuman = false)
         {
-            if(IsInBounds(start) && IsInBounds(end)) {
-                Piece endPiece = this.GetPiece(end);
-                Piece startPiece = this.GetPiece(start);
-                if (endPiece == Piece.Empty && startPiece.GetColor() == this.playing) {
+            if (IsInBounds(start) && IsInBounds(end))
+            {
+                Piece endPiece = GetPiece(end);
+                Piece startPiece = GetPiece(start);
+                if (endPiece == Piece.Empty && startPiece.GetColor() == playing)
+                {
                     (int y, int x) delta = (end.y - start.y, end.x - start.x);
 
-                    if (startPiece.IsKing() || (startPiece.IsPawn() && startPiece.IsValidDirection(delta.y))) {
+                    if (startPiece.IsKing() || startPiece.IsPawn() && startPiece.IsValidDirection(delta.y))
+                    {
                         MoveType type = GetMoveType(delta);
+
                         // Regular move
-                        if (type == MoveType.Normal) {
-                            return true;
+                        if (type == MoveType.Normal)
+                        {
+                            if (isHuman)
+                            {
+                                var pieceCaptureMoves = GetAllMovesByType(MoveType.Capture).ToList();
+                                if (pieceCaptureMoves.Count() == 0)
+                                    return true;
+                                else
+                                    return false;
+                            }
+                            else return true;
                         }
                         // Capture move
-                        else if (type == MoveType.Capture) {
-                            Piece capturedPiece = this.GetPiece((start.y + delta.y/2, start.x + delta.x/2));
-                            if (capturedPiece.IsPiece() && startPiece.GetColor() != capturedPiece.GetColor()) {
-                               return true;
+                        else if (type == MoveType.Capture)
+                        {
+                            Piece capturedPiece = GetPiece((start.y + delta.y / 2, start.x + delta.x / 2));
+                            if (capturedPiece.IsPiece() && startPiece.GetColor() != capturedPiece.GetColor())
+                            {
+                                return true;
                             }
                         }
                     }
                 }
             }
-            return false; 
+            return false;
         }
 
-        public bool MakeMove((int y, int x) start, (int y, int x) end)
+        public bool MakeMove((int y, int x) start, (int y, int x) end, bool isHuman = false)
         {
-            if (IsMoveValid(start, end)) {
+            if (IsMoveValid(start, end, isHuman))
+            {
                 (int y, int x) delta = (end.y - start.y, end.x - start.x);
                 MoveType type = GetMoveType(delta);
-                
+
                 // Remove captured piece if it was a capture
-                if (type == MoveType.Capture) {
-                    this.board[start.y + delta.y/2, start.x + delta.x/2] = Piece.Empty;
-                    this.captureMode = true;
+                if (type == MoveType.Capture)
+                {
+                    board[start.y + delta.y / 2, start.x + delta.x / 2] = Piece.Empty;
+                    captureMode = true;
                 }
-                else {
+                else
+                {
                     // Switch to the opposing color
-                    this.playing = this.playing == Color.Black? Color.White : Color.Black;
+                    playing = playing == Color.Black ? Color.White : Color.Black;
                 }
 
                 Piece movingPiece = GetPiece(start);
-                this.board[start.y, start.x] = Piece.Empty;
+                board[start.y, start.x] = Piece.Empty;
 
                 // Handle promotion, or just move the piece to the destination
                 if (end.y == 0 && movingPiece == Piece.BlackPawn)
-                    this.board[end.y, end.x] = Piece.BlackKing;
-                else if (end.y == size-1 && movingPiece == Piece.WhitePawn)
-                    this.board[end.y, end.x] = Piece.WhiteKing;
+                    board[end.y, end.x] = Piece.BlackKing;
+                else if (end.y == size - 1 && movingPiece == Piece.WhitePawn)
+                    board[end.y, end.x] = Piece.WhiteKing;
                 else
-                    this.board[end.y, end.x] = movingPiece;
+                    board[end.y, end.x] = movingPiece;
 
-                this.lastMove = (start, end);
+                lastMove = (start, end);
 
                 // Check if the capturing can continue or not
-                if (captureMode) {
+                if (captureMode)
+                {
                     var pieceCaptureMoves = GetPieceMovesByType(lastMove.end, MoveType.Capture).ToList();
-                    if (pieceCaptureMoves.Count() == 0) {
+                    if (pieceCaptureMoves.Count() == 0)
+                    {
                         captureMode = false;
-                        this.playing = this.playing == Color.Black? Color.White : Color.Black;
+                        playing = playing == Color.Black ? Color.White : Color.Black;
                     }
                 }
 
                 return true;
             }
-            else {
+            else
+            {
                 return false;
             }
         }
 
         // Name temporary?
-        public Board NextState((int y, int x) start, (int y, int x) end)
+        public Board NextState((int y, int x) start, (int y, int x) end, bool isHuman = false)
         {
-            Board next = this.Clone(); 
-            if(next.MakeMove(start, end))
+            Board next = Clone();
+            next.prevBoard = this;
+            if (next.MakeMove(start, end, isHuman)) {
                 return next;
-            else
+            }else
                 return null;
         }
 
         public bool IsInBounds((int y, int x) pos)
         {
-            return pos.y >= 0 && pos.y < size && 
+            return pos.y >= 0 && pos.y < size &&
                    pos.x >= 0 && pos.x < size;
         }
 
         private IEnumerable<((int y, int x) start, (int y, int x) end)> GetPieceMovesByType((int y, int x) piecePos, MoveType type)
         {
             Piece piece = GetPiece(piecePos);
-            if (piece.GetColor() == this.playing) {
+            if (piece.GetColor() == playing)
+            {
                 // Goes in both y directions for kings, only one otherwise
-                for (int dy = -1; dy <= 1; dy += 2) {
+                for (int dy = -1; dy <= 1; dy += 2)
+                {
                     if (!piece.IsValidDirection(dy))
                         continue;
                     // Both x directions for everything
-                    for (int dx = -1; dx <= 1; dx += 2) {
-                        (int y, int x) normalMove = (piecePos.y+dy, piecePos.x+dx);
-                        (int y, int x) captureMove = (piecePos.y+dy*2, piecePos.x+dx*2);
+                    for (int dx = -1; dx <= 1; dx += 2)
+                    {
+                        (int y, int x) normalMove = (piecePos.y + dy, piecePos.x + dx);
+                        (int y, int x) captureMove = (piecePos.y + dy * 2, piecePos.x + dx * 2);
 
                         if (type == MoveType.Normal && IsMoveValid(piecePos, normalMove))
                             yield return (piecePos, normalMove);
@@ -257,9 +303,12 @@ namespace ALICheckers
         private IEnumerable<((int y, int x) start, (int y, int x) end)> GetAllMovesByType(MoveType type)
         {
             // Scan for the current player's pieces
-            for (int y = 0; y < size; y++) {
-                for (int x = 0; x < size; x++) {
-                    foreach(var pieceMove in GetPieceMovesByType((y,x), type)) {
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    foreach (var pieceMove in GetPieceMovesByType((y, x), type))
+                    {
                         yield return pieceMove;
                     }
                 }
@@ -270,13 +319,14 @@ namespace ALICheckers
         public List<((int y, int x) start, (int y, int x) end)> GetAllMoves()
         {
             // Last move was a capture move, and they have more pieces they can capture
-            if (captureMode) {
+            if (captureMode)
+            {
                 return GetPieceMovesByType(lastMove.end, MoveType.Capture).ToList();
-            } 
+            }
 
             var captureMoves = GetAllMovesByType(MoveType.Capture).ToList();
             if (captureMoves.Count() != 0)
-                return captureMoves; 
+                return captureMoves;
             else
                 return GetAllMovesByType(MoveType.Normal).ToList();
         }
@@ -289,12 +339,12 @@ namespace ALICheckers
             else
                 return Minmax(depth, +100000, -100000);
         }
-        
+
         public (int bestScore, Board bestChild) Minmax(int depth, int bestOverallScore, int limit)
         {
-            var minOrMax = playing == Color.Black? (Func<int, int, int>) Math.Max : Math.Min;
-            var minOrMaxInv = playing == Color.Black? (Func<int, int, int>) Math.Min : Math.Max;
-            int worstScore = minOrMaxInv(100000,-100000);
+            var minOrMax = playing == Color.Black ? (Func<int, int, int>)Math.Max : Math.Min;
+            var minOrMaxInv = playing == Color.Black ? (Func<int, int, int>)Math.Min : Math.Max;
+            int worstScore = minOrMaxInv(100000, -100000);
 
             var allMoves = GetAllMoves();
             // In case of a loss don't go further.
@@ -303,23 +353,28 @@ namespace ALICheckers
             if (allMoves.Count() == 0)
                 return (worstScore, this);
 
-            if (depth == 0) {
-                return (this.GetScore(), this);
+            if (depth == 0)
+            {
+                return (GetScore(), this);
             }
-            else {
+            else
+            {
                 int bestScore = worstScore;
                 Board bestChild = null;
 
-                foreach (var move in allMoves) {
-                    Board child = this.NextState(move.start, move.end);
-                    var childMinmax = (child.playing == this.playing? 
-                            child.Minmax(depth-1, bestOverallScore, limit) :
-                            child.Minmax(depth-1, limit, bestOverallScore));
-                    if (minOrMax(childMinmax.bestScore, bestScore) == childMinmax.bestScore) {
+                foreach (var move in allMoves)
+                {
+                    Board child = NextState(move.start, move.end);
+                    var childMinmax = child.playing == playing ?
+                            child.Minmax(depth - 1, bestOverallScore, limit) :
+                            child.Minmax(depth - 1, limit, bestOverallScore);
+                    if (minOrMax(childMinmax.bestScore, bestScore) == childMinmax.bestScore)
+                    {
                         bestScore = childMinmax.bestScore;
                         bestChild = child;
 
-                        if (minOrMax(bestScore, bestOverallScore) == bestScore) {
+                        if (minOrMax(bestScore, bestOverallScore) == bestScore)
+                        {
                             bestOverallScore = bestScore;
                             if (minOrMax(bestOverallScore, limit) == bestOverallScore)
                                 break;
@@ -334,9 +389,11 @@ namespace ALICheckers
         override public string ToString()
         {
             string res = "";
-            for (int y = 0; y < this.size; y++) {
-                for (int x = 0; x < this.size; x++) {
-                    res += (char)this.board[y,x];
+            for (int y = 0; y < size; y++)
+            {
+                for (int x = 0; x < size; x++)
+                {
+                    res += (char)board[y, x];
                 }
                 res += '\n';
             }

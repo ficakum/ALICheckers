@@ -1,8 +1,8 @@
 using System;
 
-namespace ALICheckers
+namespace ALICheckersLogic
 {
-    enum Piece 
+    public enum Piece
     {
         Blocked = ' ',
         Empty = '_',
@@ -12,14 +12,14 @@ namespace ALICheckers
         BlackKing = 'X'
     }
 
-    enum Color
+    public enum Color
     {
         None = 0,
         White = -1,
         Black = 1
     }
 
-    static class PieceExtensions
+    public static class PieceExtensions
     {
         public static bool IsWhite(this Piece piece)
         {
@@ -49,9 +49,9 @@ namespace ALICheckers
         // Maybe better to have everything use this instead?
         public static Color GetColor(this Piece piece)
         {
-            if(piece.IsWhite())
+            if (piece.IsWhite())
                 return Color.White;
-            else if(piece.IsBlack())
+            else if (piece.IsBlack())
                 return Color.Black;
             else
                 return Color.None;
@@ -60,14 +60,14 @@ namespace ALICheckers
         // White goes down, increasing the y coordinate, black does the opposite.
         public static int GetDirection(this Piece piece)
         {
-            return piece.IsWhite()? 1 : -1;
+            return piece.IsWhite() ? 1 : -1;
         }
 
         // No need to check for kings, otherwise check if signs match.
         public static bool IsValidDirection(this Piece piece, int deltaY)
         {
-            return (piece.IsKing() ||
-                    (piece.IsPawn() && (piece.GetDirection() < 0) == (deltaY < 0)));
+            return piece.IsKing() ||
+                    piece.IsPawn() && piece.GetDirection() < 0 == deltaY < 0;
         }
     }
 }

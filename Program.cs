@@ -1,7 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 
-namespace ALICheckers
+namespace ALICheckersLogic
 {
     class Program
     {
@@ -13,18 +13,21 @@ namespace ALICheckers
             if (args.Length >= 1 && args[0] == "cpu")
                 cpuOnly = true;
 
-            while(!b.IsFinished()) {
-                Console.WriteLine("Playing: " + (cpuMove? "White" : "Black"));
+            while (!b.IsFinished())
+            {
+                Console.WriteLine("Playing: " + (cpuMove ? "White" : "Black"));
                 Console.WriteLine(b);
-                
-                if (!cpuOnly && !cpuMove) {
+
+                if (!cpuOnly && !cpuMove)
+                {
                     Console.WriteLine("Moves: ");
                     foreach (var m in b.GetAllMoves())
                         Console.WriteLine(m);
-                    var move = ReadMove(); 
+                    var move = ReadMove();
                     b = b.NextState(move.start, move.end);
                 }
-                else {
+                else
+                {
                     var minmax = b.Minmax();
                     Console.WriteLine("Best score: " + minmax.bestScore);
                     b = minmax.bestChild;
@@ -38,8 +41,8 @@ namespace ALICheckers
         {
             (int y, int x) pos;
             string[] inputArr = Console.ReadLine().Split();
-            Int32.TryParse(inputArr[0], out pos.y);
-            Int32.TryParse(inputArr[1], out pos.x);
+            int.TryParse(inputArr[0], out pos.y);
+            int.TryParse(inputArr[1], out pos.x);
             return pos;
         }
 
