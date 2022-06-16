@@ -1,6 +1,8 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
+using System.Text.Json;
 
 namespace ALICheckersLogic
 {
@@ -27,6 +29,8 @@ namespace ALICheckersLogic
         const int PieceRowCount = 3;
         const string PositionChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 
+        static Dictionary<string, ((int y, int x) start, (int y, int x) end)> cache = new Dictionary<string, ((int y, int x) start, (int y, int x) end)>();
+        public bool useCache = true;
 
         private static Random rng = new Random();
 
@@ -144,6 +148,9 @@ namespace ALICheckersLogic
             // How close they are to promoting pawns
             int blackPositionScore = 0;
             int whitePositionScore = 0;
+
+            int boardHalf = size / 2;
+
             for (int y = 0; y < size; y++)
             {
                 for (int x = 0; x < size; x++)
@@ -152,10 +159,12 @@ namespace ALICheckersLogic
                     {
                         case Piece.BlackPawn:
                             blackPieceScore += 3;
+                            // Reward pawns for being closer to becoming a king
                             blackPositionScore += size - y - 1;
                             break;
                         case Piece.BlackKing:
                             blackPieceScore += 5;
+                            blackPositionScore += (y <= boardHalf ? y : y - 1 - boardHalf) * 2;
                             break;
                         case Piece.WhitePawn:
                             whitePieceScore += 3;
@@ -163,6 +172,7 @@ namespace ALICheckersLogic
                             break;
                         case Piece.WhiteKing:
                             whitePieceScore += 5;
+                            whitePositionScore += (y <= boardHalf ? y : y - 1 - boardHalf) * 2;
                             break;
                     }
                 }
@@ -274,14 +284,13 @@ namespace ALICheckersLogic
             }
         }
 
-        // Name temporary?
         public Board NextState((int y, int x) start, (int y, int x) end, bool isHuman = false)
         {
             Board next = Clone();
             next.prevBoard = this;
             if (next.MakeMove(start, end, isHuman)) {
                 return next;
-            }else
+            } else
                 return null;
         }
 
@@ -350,13 +359,27 @@ namespace ALICheckersLogic
 
         public (int bestScore, Board bestChild) Minmax(int depth = 9)
         {
+            var boardStr = this.ToString();
+            if (useCache && cache.ContainsKey(boardStr))
+            {
+                var move = cache[boardStr];
+                var newBoard = this.NextState(move.start, move.end);
+                return (newBoard.GetScore(), newBoard);
+            }
+
+            (int bestScore, Board bestChild) res;
             if (playing == Color.Black)
-                return Minmax(depth, -100000, +100000);
+                res = Minmax(depth, -100000, +100000);
             else
-                return Minmax(depth, +100000, -100000);
+                res = Minmax(depth, +100000, -100000);
+
+            if (useCache)
+                cache[boardStr] = res.bestChild.lastMove;
+
+            return res;
         }
 
-        public (int bestScore, Board bestChild) Minmax(int depth, int bestOverallScore, int limit)
+        private (int bestScore, Board bestChild) Minmax(int depth, int bestOverallScore, int limit)
         {
             var minOrMax = playing == Color.Black ? (Func<int, int, int>)Math.Max : Math.Min;
             var minOrMaxInv = playing == Color.Black ? (Func<int, int, int>)Math.Min : Math.Max;
@@ -414,6 +437,43 @@ namespace ALICheckersLogic
                 res += '\n';
             }
             return res;
+        }
+
+        // JSONSerializer can't save valuetuples, have to convert to/from MoveShim class.
+        private class MoveShim
+        {
+            public int X1 { get; set; }
+            public int Y1 { get; set; }
+            public int X2 { get; set; }
+            public int Y2 { get; set; }
+        }
+
+        public static void LoadCache(string path)
+        {
+            Board.cache = JsonSerializer.Deserialize<Dictionary<string, MoveShim>>(File.ReadAllText(path)).ToDictionary(kvp => kvp.Key, kvp => {
+                var move = kvp.Value;
+                return (
+                    (move.Y1, move.X1),
+                    (move.Y2, move.X2)
+                );
+            });
+        }
+        
+        public static void SaveCache(string path)
+        {
+            var savableCache = Board.cache.ToDictionary(kvp => kvp.Key, kvp => {
+                var start = kvp.Value.start;
+                var end = kvp.Value.end;
+                return new MoveShim
+                {
+                    X1 = start.x,
+                    Y1 = start.y,
+                    X2 = end.x,
+                    Y2 = end.y,
+                };
+            });
+
+            File.WriteAllText(path, JsonSerializer.Serialize(savableCache));
         }
     }
 }
