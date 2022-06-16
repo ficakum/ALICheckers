@@ -4,7 +4,7 @@ using System.Linq;
 
 namespace ALICheckersLogic
 {
-    enum MoveType
+    public enum MoveType
     {
         Invalid,
         Normal,
@@ -21,12 +21,25 @@ namespace ALICheckersLogic
 
         // For the midstates where we're only allowed to continue capturing
         bool captureMode = false;
-        ((int y, int x) start, (int y, int x) end) lastMove = ((-1, -1), (-1, -1));
-        Board prevBoard = null;
+        public ((int y, int x) start, (int y, int x) end) lastMove = ((-1, -1), (-1, -1));
+        public Board prevBoard = null;
 
         const int PieceRowCount = 3;
+        const string PositionChars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
 
         private static Random rng = new Random();
+
+        public string LastMoveString
+        {
+            get
+            {
+                if (lastMove == ((-1, -1), (-1, -1)))
+                    return "Start";
+                else
+                    return $"{PositionChars[lastMove.start.x]}{lastMove.start.y} -> {PositionChars[lastMove.end.x]}{lastMove.end.y}";
+            }
+        }
 
         public Piece this[int y, int x]
         {
@@ -90,19 +103,17 @@ namespace ALICheckersLogic
             }
         }
 
-        // Temporary name?
-        public Piece GetPiece((int y, int x) position)
-        {
-            return board[position.y, position.x];
-        }
-
         public Board Clone()
         {
             return new Board(this);
         }
 
-        // Should be in the move class probably
-        private MoveType GetMoveType((int y, int x) delta)
+        public Piece GetPiece((int y, int x) position)
+        {
+            return board[position.y, position.x];
+        }
+
+        public MoveType GetMoveType((int y, int x) delta)
         {
             (int y, int x) deltaAbs = (Math.Abs(delta.y), Math.Abs(delta.x));
             if (deltaAbs.y == 1 && deltaAbs.x == 1)
@@ -117,6 +128,11 @@ namespace ALICheckersLogic
             {
                 return MoveType.Invalid;
             }
+        }
+
+        public MoveType GetMoveType(((int y, int x) start, (int y, int x) end) move)
+        {
+            return GetMoveType((move.end.y - move.start.y, move.end.x - move.end.y));
         }
 
         // Probably better to keep a counter rather than scaning every time
@@ -151,8 +167,8 @@ namespace ALICheckersLogic
                     }
                 }
             }
-            return (blackPieceScore - whitePieceScore) * 100 +
-                    (blackPositionScore - whitePositionScore) +
+            return (blackPieceScore - whitePieceScore) * 1000 +
+                    (blackPositionScore - whitePositionScore) * 10 +
                     rng.Next(0, 10);
         }
 
@@ -275,7 +291,7 @@ namespace ALICheckersLogic
                    pos.x >= 0 && pos.x < size;
         }
 
-        private IEnumerable<((int y, int x) start, (int y, int x) end)> GetPieceMovesByType((int y, int x) piecePos, MoveType type)
+        public IEnumerable<((int y, int x) start, (int y, int x) end)> GetPieceMovesByType((int y, int x) piecePos, MoveType type)
         {
             Piece piece = GetPiece(piecePos);
             if (piece.GetColor() == playing)
@@ -300,7 +316,7 @@ namespace ALICheckersLogic
             }
         }
 
-        private IEnumerable<((int y, int x) start, (int y, int x) end)> GetAllMovesByType(MoveType type)
+        public IEnumerable<((int y, int x) start, (int y, int x) end)> GetAllMovesByType(MoveType type)
         {
             // Scan for the current player's pieces
             for (int y = 0; y < size; y++)
